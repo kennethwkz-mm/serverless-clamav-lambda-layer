@@ -1,71 +1,84 @@
-const { execSync } = require("child_process");
-const { writeFileSync, unlinkSync } = require("fs");
-const AWS = require("aws-sdk");
+// https://aws.amazon.com/blogs/developer/virus-scan-s3-buckets-with-a-serverless-clamav-based-cdk-construct/
+// CDK competes with serverless
 
-const s3 = new AWS.S3();
+// https://dev.to/sutt0n/using-a-lambda-container-to-scan-files-with-clamav-via-serverless-2a5g
+import * as fs from "fs";
 
-module.exports.virusScan = async (event, context) => {
-  if (!event.Records) {
-    console.log("Not an S3 event invocation!");
-    return;
-  }
+const {execSync} = require("child_process");
+const {unlinkSync} = require("fs");
+// Node is readable.
+import { Readable } from 'stream';
+import {GetObjectCommand, GetObjectCommandOutput, PutObjectTaggingCommand} from "@aws-sdk/client-s3";
+import {s3Client} from "../../clients/s3Client";
 
-  for (const record of event.Records) {
-    if (!record.s3) {
-      console.log("Not an S3 Record!");
-      continue;
+const  writeFile = async (key: string, readable: Readable) => {
+    const output = fs.createWriteStream(`/tmp/${key}`)
+    for await (const chunk of readable) {
+        output.write(chunk)
+    }
+    output.close();
+}
+
+
+export const virusScan = async (event) => {
+    if (!event.Records) {
+        console.log("Not an S3 event invocation!");
+        return;
     }
 
-    // get the file
-    const s3Object = await s3
-      .getObject({
-        Bucket: record.s3.bucket.name,
-        Key: record.s3.object.key
-      })
-      .promise();
-
-    // write file to disk
-    writeFileSync(`/tmp/${record.s3.object.key}`, s3Object.Body);
-    
-    try { 
-      // scan it
-      const scanStatus = execSync(`clamscan --database=/opt/var/lib/clamav /tmp/${record.s3.object.key}`);
-
-      await s3
-        .putObjectTagging({
-          Bucket: record.s3.bucket.name,
-          Key: record.s3.object.key,
-          Tagging: {
-            TagSet: [
-              {
-                Key: 'av-status',
-                Value: 'clean'
-              }
-            ]
-          }
-        })
-        .promise();
-    } catch(err) {
-      if (err.status === 1) {
-        // tag as dirty, OR you can delete it
-        await s3
-          .putObjectTagging({
+    for (const record of event.Records) {
+        if (!record.s3) {
+            console.log("Not an S3 Record!");
+            continue;
+        }
+        const getObjectCommand = new GetObjectCommand({
             Bucket: record.s3.bucket.name,
-            Key: record.s3.object.key,
-            Tagging: {
-              TagSet: [
-                {
-                  Key: 'av-status',
-                  Value: 'dirty'
-                }
-              ]
-            }
-          })
-          .promise();
-      }
-    }
+            Key: record.s3.object.key
+        })
+        const s3Object: GetObjectCommandOutput = await s3Client.send(getObjectCommand);
+        const body = s3Object.Body as Readable;
+        await writeFile(record.s3.object.key, body);
 
-    // delete the temp file
-    unlinkSync(`/tmp/${record.s3.object.key}`);
-  }
-};
+        try {
+            // scan it
+            const scanStatus = execSync(`clamscan --database=/opt/var/lib/clamav /tmp/${record.s3.object.key}`);
+            console.log(`Scan status is ${scanStatus}`);
+            const putObjectTaggingCommand = new PutObjectTaggingCommand({
+                Bucket: record.s3.bucket.name,
+                Key: record.s3.object.key,
+                Tagging: {
+                    TagSet: [
+                        {
+                            Key: 'av-status',
+                            Value: 'clean'
+                        }
+                    ]
+                }
+            })
+            await s3Client.send(putObjectTaggingCommand);
+        } catch (err) {
+            if (err.status === 1) {
+                // Delete the file. Make sure people can't download it.
+                const putObjectTaggingCommand = new PutObjectTaggingCommand({
+                    Bucket: record.s3.bucket.name,
+                    Key: record.s3.object.key,
+                    Tagging: {
+                        TagSet: [
+                            {
+                                Key: 'av-status',
+                                Value: 'dirty'
+                            }
+                        ]
+                    }
+                })
+                await s3Client.send(putObjectTaggingCommand);
+            }
+        }
+
+        // delete the temp file
+        unlinkSync(`/tmp/${record.s3.object.key}`);
+    }
+}
+
+export const main = virusScan;
+
