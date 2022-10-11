@@ -1,4 +1,4 @@
-FROM amazonlinux:2
+FROM --platform=linux/amd64 amazonlinux:2
 
 WORKDIR /home/build
 
@@ -9,6 +9,7 @@ RUN echo "Prepping ClamAV"
 RUN rm -rf bin
 RUN rm -rf lib
 
+RUN echo "enabled = 0 " >> /etc/yum/pluginconf.d/priorities.conf
 RUN yum update -y
 RUN amazon-linux-extras install epel -y
 RUN yum install -y cpio yum-utils tar.x86_64 gzip zip
@@ -75,3 +76,6 @@ RUN zip -r9 clamav_lambda_layer.zip bin
 RUN zip -r9 clamav_lambda_layer.zip lib
 RUN zip -r9 clamav_lambda_layer.zip var
 RUN zip -r9 clamav_lambda_layer.zip etc
+RUN zip -r9 clamav_lambda_layer.zip opt
+
+# public.ecr.aws/lambda/nodejs:16

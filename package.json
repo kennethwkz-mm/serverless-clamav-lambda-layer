@@ -1,11 +1,16 @@
 {
-  "name": "aws-ffmpeg-layer",
+  "name": "aws-clamav-layer",
   "description": "",
   "version": "0.1.0",
-  "dependencies": {},
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.178.0"
+  },
   "devDependencies": {
-    "aws-sdk": "^2.964.0",
-    "jest": "^27.0.6"
+    "@serverless/typescript": "^3.21.0",
+    "@types/jest": "^29.0.3",
+    "dotenv": "^16.0.3",
+    "jest": "^29.0.3",
+    "ts-jest": "^29.0.2"
   },
   "scripts": {
     "build": "./build.sh",

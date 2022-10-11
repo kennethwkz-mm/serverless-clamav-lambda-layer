@@ -18,8 +18,6 @@ const  writeFile = async (key: string, readable: Readable) => {
     }
     output.close();
 }
-
-
 export const virusScan = async (event) => {
     if (!event.Records) {
         console.log("Not an S3 event invocation!");
@@ -33,15 +31,14 @@ export const virusScan = async (event) => {
         }
         const getObjectCommand = new GetObjectCommand({
             Bucket: record.s3.bucket.name,
-            Key: record.s3.object.key
+                Key: record.s3.object.key
         })
         const s3Object: GetObjectCommandOutput = await s3Client.send(getObjectCommand);
         const body = s3Object.Body as Readable;
         await writeFile(record.s3.object.key, body);
 
         try {
-            // scan it
-            const scanStatus = execSync(`clamscan --database=/opt/var/lib/clamav /tmp/${record.s3.object.key}`);
+            const scanStatus = execSync(`clamscan --database=/opt/opt/var/lib/clamav /tmp/${record.s3.object.key}`);
             console.log(`Scan status is ${scanStatus}`);
             const putObjectTaggingCommand = new PutObjectTaggingCommand({
                 Bucket: record.s3.bucket.name,
@@ -82,3 +79,10 @@ export const virusScan = async (event) => {
 
 export const main = virusScan;
 
+/*
+2022-09-24T04:57:13.319Z	a57bdd96-bb4d-4a3c-bff0-226eed1171c1	ERROR	Invoke Error 	{"errorType":"TypeError","errorMessage":"The \"data\" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received an instance of IncomingMessage","code":"ERR_INVALID_ARG_TYPE","stack":["TypeError [ERR_INVALID_ARG_TYPE]: The \"data\" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received an instance of IncomingMessage","    at writeFileSync (node:fs:2163:5)","    at Runtime.s [as handler] (/var/task/src/functions/virus-scan/handler.js:1:2699)","    at processTicksAndRejections (node:internal/process/task_queues:96:5)"]}
+
+ yieldUint8Chunks
+
+ https://stackoverflow.com/questions/66881761/type-error-property-pipe-does-not-exist-on-type-readablestreamuint8array
+ */
