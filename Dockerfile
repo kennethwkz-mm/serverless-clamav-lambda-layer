@@ -1,4 +1,4 @@
-FROM amazonlinux:2 AS layer-image
+FROM --platform=linux/amd64 amazonlinux:2 AS layer-image
 
 WORKDIR /home/build
 
@@ -9,6 +9,7 @@ RUN echo "Prepping ClamAV"
 RUN rm -rf bin
 RUN rm -rf lib
 
+RUN echo "enabled = 0 " >> /etc/yum/pluginconf.d/priorities.conf
 RUN yum update -y
 RUN amazon-linux-extras install epel -y
 RUN yum install -y cpio yum-utils tar.x86_64 gzip zip
@@ -68,7 +69,7 @@ RUN useradd -g clamav -s /bin/false -c "Clam Antivirus" clamupdate
 
 RUN LD_LIBRARY_PATH=./lib ./bin/freshclam --config-file=bin/freshclam.conf
 
-FROM public.ecr.aws/lambda/nodejs:14
+FROM public.ecr.aws/lambda/nodejs:18
 
 COPY --from=layer-image /home/build ./
 

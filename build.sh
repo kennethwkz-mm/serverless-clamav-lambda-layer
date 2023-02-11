@@ -3,4 +3,4 @@
 rm -rf ./layer
 mkdir layer
 
-docker build -t clamav -f Dockerfile .
+docker build --platform linux/amd64 -t clamav -f Dockerfile .
