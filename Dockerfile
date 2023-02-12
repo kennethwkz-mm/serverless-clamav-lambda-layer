@@ -23,6 +23,12 @@ RUN rpm2cpio clamav-lib*.rpm | cpio -vimd
 RUN yumdownloader -x \*i686 --archlist=x86_64 clamav-update
 RUN rpm2cpio clamav-update*.rpm | cpio -vimd
 
+RUN yumdownloader -x \*i686 --archlist=x86_64 clamd
+RUN rpm2cpio clamd*.rpm | cpio -vimd
+
+RUN yumdownloader -x \*i686 --archlist=x86_64 systemd-libs
+RUN rpm2cpio systemd*.rpm | cpio -vimd
+
 RUN yumdownloader -x \*i686 --archlist=x86_64 json-c
 RUN rpm2cpio json-c*.rpm | cpio -vimd
 
@@ -50,16 +56,28 @@ RUN rpm2cpio gnutls*.rpm | cpio -vimd
 RUN yumdownloader -x \*i686 --archlist=x86_64 nettle
 RUN rpm2cpio nettle*.rpm | cpio -vimd
 
+RUN yumdownloader -x \*i686 --archlist=x86_64 lz4
+RUN rpm2cpio lz4*.rpm | cpio -vimd
+
+RUN yumdownloader -x \*i686 --archlist=x86_64 elfutils-libs
+RUN rpm2cpio elfutils-libs*.rpm | cpio -vimd
+
+RUN yumdownloader -x \*i686 --archlist=x86_64 elfutils-libelf
+RUN rpm2cpio elfutils-libelf*.rpm | cpio -vimd
+
 RUN mkdir -p bin
 RUN mkdir -p lib
 RUN mkdir -p var/lib/clamav
 RUN chmod -R 777 var/lib/clamav
 
 COPY ./freshclam.conf .
+COPY ./clamd.conf .
 
-RUN cp usr/bin/clamscan usr/bin/freshclam bin/.
-RUN cp usr/lib64/* lib/.
+RUN cp -r usr/bin/clamscan usr/bin/freshclam usr/sbin/clamd usr/bin/clamdscan bin/.
+RUN cp -r usr/lib64/* lib/.
 RUN cp freshclam.conf bin/freshclam.conf
+RUN cp clamd.conf bin/clamd.conf
+RUN rm *.rpm
 
 RUN yum install shadow-utils.x86_64 -y
 
@@ -71,8 +89,10 @@ RUN LD_LIBRARY_PATH=./lib ./bin/freshclam --config-file=bin/freshclam.conf
 
 FROM public.ecr.aws/lambda/nodejs:18
 
+RUN yum update -y
+
 COPY --from=layer-image /home/build ./
 
-COPY handler.js ./
+COPY handler.mjs ./
 
 CMD ["handler.virusScan"]
